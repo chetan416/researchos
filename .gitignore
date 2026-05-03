@@ -1,0 +1,5 @@
+venv
+papers
+backend/.env
+frontend/.env.local
+frontend/.env.production
