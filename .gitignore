@@ -3,3 +3,7 @@ papers
 backend/.env
 frontend/.env.local
 frontend/.env.production
+node_modules/
+frontend/node_modules/
+venv/
+*.pdf
