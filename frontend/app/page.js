@@ -62,7 +62,7 @@ export default function Home() {
 
   const fetchHistory = async () => {
     const { data: { session } } = await supabase.auth.getSession()
-    const res = await fetch('http://localhost:8000/history', {
+    const res = await fetch('https://researchos-production-c3d6.up.railway.app/history', {
       headers: { Authorization: `Bearer ${session.access_token}` }
     })
     const data = await res.json()
@@ -104,7 +104,7 @@ export default function Home() {
       const headers = {}
       if (session) headers['Authorization'] = `Bearer ${session.access_token}`
 
-      const res = await fetch('http://localhost:8000/synthesise', {
+      const res = await fetch('https://researchos-production-c3d6.up.railway.app/synthesise', {
         method: 'POST',
         headers,
         body: formData,
