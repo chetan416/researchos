@@ -16,7 +16,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "https://researchos-sigma.vercel.app",],
+        "https://researchos-sigma.vercel.app",
+        "https://researchos-jnrlejorf-chetan416s-projects.vercel.app",],
     allow_methods=["*"],
     allow_headers=["*"],
 )
