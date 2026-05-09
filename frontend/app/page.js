@@ -60,6 +60,74 @@ export default function Home() {
     if (user) fetchHistory()
   }, [user])
 
+  const exportPDF = (result) => {
+    const { jsPDF } = window.jspdf
+    const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const margin = 15
+    const maxWidth = pageWidth - margin * 2
+    let y = 20
+
+    const addText = (text, size = 11, bold = false, color = [30, 30, 30]) => {
+      doc.setFontSize(size)
+      doc.setFont('helvetica', bold ? 'bold' : 'normal')
+      doc.setTextColor(...color)
+      const lines = doc.splitTextToSize(text, maxWidth)
+      lines.forEach(line => {
+        if (y > 270) { doc.addPage(); y = 20 }
+        doc.text(line, margin, y)
+        y += size * 0.5
+      })
+      y += 4
+    }
+
+    const addSection = (title, content) => {
+      if (y > 240) { doc.addPage(); y = 20 }
+      y += 4
+      doc.setDrawColor(200, 200, 200)
+      doc.line(margin, y, pageWidth - margin, y)
+      y += 8
+      addText(title, 13, true, [30, 60, 120])
+      addText(content, 10)
+    }
+
+    addText('ResearchOS - Synthesis Report', 18, true, [30, 60, 120])
+    addText(new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }), 10, false, [120, 120, 120])
+    y += 6
+
+    addText('Papers Analysed', 13, true, [30, 60, 120])
+    result.papers.forEach((p, i) => addText(`[P${i + 1}] ${p}`, 10))
+
+    addSection('Common Themes', result.themes)
+    addSection('Agreements and Contradictions', result.agreements)
+    addSection('Research Gaps', result.gaps)
+    addSection('Unified Synthesis', result.synthesis)
+
+    doc.save('researchos-synthesis.pdf')
+  }
+
+  const exportBibTeX = (result) => {
+    const entries = result.papers.map((paper, i) => {
+      const name = paper.replace('.pdf', '').replace(/[^a-zA-Z0-9\s]/g, '').trim()
+      const key = name.split(' ').slice(0, 3).join('').toLowerCase()
+      const year = new Date().getFullYear()
+      return `@article{${key}${year},
+  title     = {${name}},
+  author    = {Unknown},
+  year      = {${year}},
+  note      = {Uploaded to ResearchOS on ${new Date().toLocaleDateString()}}
+}`
+    }).join('\n\n')
+
+    const blob = new Blob([entries], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'researchos-citations.bib'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const fetchHistory = async () => {
     const { data: { session } } = await supabase.auth.getSession()
     const res = await fetch('https://researchos-production-c3d6.up.railway.app/history', {
@@ -258,7 +326,22 @@ export default function Home() {
             {/* Results */}
             {result && (
               <div className="space-y-4">
-                <div className="bg-white rounded-xl border border-gray-100 p-4">
+                <div className="flex gap-2 justify-end">
+                  <button
+                    onClick={() => exportPDF(result)}
+                    className="text-sm px-4 py-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition text-gray-700"
+                  >
+                    Export PDF
+                  </button>
+                  <button
+                    onClick={() => exportBibTeX(result)}
+                    className="text-sm px-4 py-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition text-gray-700"
+                  >
+                    Export BibTeX
+                  </button>
+                </div>
+
+    <div className="bg-white rounded-xl border border-gray-100 p-4">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Papers analysed</p>
                   <ul className="space-y-1">
                     {result.papers.map((p, i) => (
@@ -269,10 +352,10 @@ export default function Home() {
                     ))}
                   </ul>
                 </div>
-                <Section title="🔗 Common Themes" content={result.themes} bg="bg-white border border-gray-100" titleColor="text-gray-700" />
-                <Section title="⚡ Agreements & Contradictions" content={result.agreements} bg="bg-white border border-gray-100" titleColor="text-gray-700" />
-                <Section title="🔍 Research Gaps" content={result.gaps} bg="bg-yellow-50" titleColor="text-yellow-800" />
-                <Section title="✅ Unified Synthesis" content={result.synthesis} bg="bg-green-50" titleColor="text-green-800" />
+                <Section title="Common Themes" content={result.themes} bg="bg-white border border-gray-100" titleColor="text-gray-700" />
+                <Section title="Agreements & Contradictions" content={result.agreements} bg="bg-white border border-gray-100" titleColor="text-gray-700" />
+                <Section title="Research Gaps" content={result.gaps} bg="bg-yellow-50" titleColor="text-yellow-800" />
+                <Section title="Unified Synthesis" content={result.synthesis} bg="bg-green-50" titleColor="text-green-800" />
               </div>
             )}
           </>
