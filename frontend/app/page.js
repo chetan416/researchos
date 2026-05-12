@@ -257,8 +257,11 @@ export default function Home() {
             >
               {authMode === 'login' ? 'Sign up' : 'Log in'}
             </button>
-            
-            
+          </p>
+
+          <p className="text-center text-xs text-gray-400 mt-2">
+            By continuing, you agree to our{' '}
+            <a href="/privacy" className="text-blue-600 hover:underline">Privacy Policy</a>        
           </p>
         </div>
       </main>
@@ -390,6 +393,9 @@ export default function Home() {
             )}
           </>
         )}
+      </div>
+      <div className="mt-12 text-center">
+        <a href="/privacy" className="text-xs text-gray-400 hover:underline">Privacy Policy</a>
       </div>
     </main>
   )
