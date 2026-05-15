@@ -171,3 +171,38 @@ async def get_history(authorization: Optional[str] = Header(None)):
         .execute()
 
     return {"history": response.data}
+
+@app.get("/stats")
+async def get_stats(authorization: Optional[str] = Header(None)):
+    user_id = get_user_id(authorization)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not logged in")
+
+    token = authorization.split(" ")[1]
+    user_supabase = create_client(
+        os.getenv("SUPABASE_URL"),
+        os.getenv("SUPABASE_KEY"),
+    )
+    user_supabase.postgrest.auth(token)
+
+    response = user_supabase.table("syntheses")\
+        .select("papers, gaps, created_at")\
+        .eq("user_id", user_id)\
+        .order("created_at", desc=True)\
+        .execute()
+
+    syntheses = response.data
+    total_syntheses = len(syntheses)
+    total_papers = sum(len(s["papers"]) for s in syntheses)
+    total_gaps = sum(
+        len([l for l in s["gaps"].split("\n") if l.strip()])
+        for s in syntheses
+        if s.get("gaps")
+    )
+
+    return {
+        "total_syntheses": total_syntheses,
+        "total_papers": total_papers,
+        "total_gaps": total_gaps,
+        "recent": syntheses[:5]
+    }
