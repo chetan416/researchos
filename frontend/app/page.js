@@ -46,6 +46,7 @@ export default function Home() {
   const [error, setError] = useState('')
   const [history, setHistory] = useState([])
   const [showHistory, setShowHistory] = useState(false)
+  const [stats, setStats] = useState(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -57,7 +58,10 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    if (user) fetchHistory()
+    if (user) {
+      fetchHistory()
+      fetchStats()
+    }
   }, [user])
 
   const exportPDF = (result) => {
@@ -135,6 +139,15 @@ export default function Home() {
     })
     const data = await res.json()
     setHistory(data.history || [])
+  }
+  const fetchStats = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+    const res = await fetch(`${'https://researchos-production-c3d6.up.railway.app'}/stats`, {
+      headers: { Authorization: `Bearer ${session.access_token}` }
+    })
+    const data = await res.json()
+    setStats(data)
   }
 
   const handleAuth = async () => {
@@ -293,6 +306,23 @@ export default function Home() {
             </button>
           </div>
         </div>
+
+        {stats && (
+          <div className="grid grid-cols-3 gap-4 mb-8">
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 text-center">
+            <p className="text-3xl font-semibold text-gray-900">{stats.total_syntheses}</p>
+            <p className="text-sm text-gray-500 mt-1">Syntheses run</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 text-center">
+            <p className="text-3xl font-semibold text-gray-900">{stats.total_papers}</p>
+            <p className="text-sm text-gray-500 mt-1">Papers analysed</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 text-center">
+            <p className="text-3xl font-semibold text-gray-900">{stats.total_gaps}</p>
+            <p className="text-sm text-gray-500 mt-1">Research gaps found</p>
+          </div>
+          </div>
+        )}
 
         {/* History view */}
         {showHistory ? (
