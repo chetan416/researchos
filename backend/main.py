@@ -75,58 +75,91 @@ async def synthesise_papers(
 
     context = build_paper_context(papers)
 
+    # Build memory context from past syntheses
+    memory_context = ""
+    if user_id and authorization:
+        try:
+            token = authorization.split(" ")[1]
+            mem_supabase = create_client(
+                os.getenv("SUPABASE_URL"),
+                os.getenv("SUPABASE_KEY"),
+            )
+            mem_supabase.postgrest.auth(token)
+            past = mem_supabase.table("syntheses")\
+                .select("papers, themes, gaps, synthesis, created_at")\
+                .eq("user_id", user_id)\
+                .order("created_at", desc=True)\
+                .limit(10)\
+                .execute()
+
+            if past.data:
+                memory_context = "\n\n=== YOUR PAST RESEARCH SESSIONS ===\n"
+                for i, s in enumerate(past.data):
+                    date = s["created_at"][:10]
+                    memory_context += f"\nSession {i+1} ({date}):\n"
+                    memory_context += f"Papers: {', '.join(s['papers'])}\n"
+                    memory_context += f"Key themes: {s['themes'][:300]}\n"
+                    memory_context += f"Gaps identified: {s['gaps'][:300]}\n"
+                print(f"MEMORY CONTEXT BUILT: {len(past.data)} past sessions found")
+                print(memory_context[:500])
+            else:
+                print("NO PAST SESSIONS FOUND IN DATABASE")
+        except Exception as e:
+            print(f"Memory fetch error: {e}")
+
     message = claude.messages.create(
         model="claude-haiku-4-5-20251001",
-        max_tokens=2500,
+        max_tokens=3000,
         messages=[
             {
                 "role": "user",
-                "content": f"""You are an expert research analyst. Analyse these {len(papers)} research papers.
-
-IMPORTANT RULES:
-- Every claim must include a citation like [P1, page 3]
-- Respond using EXACTLY these 4 markers on their own line:
-  ##THEMES##
-  ##AGREEMENTS##
-  ##GAPS##
-  ##SYNTHESIS##
-
-Format your response like this:
+                "content": f"""You are an expert research analyst with memory of this researcher's past work. Analyse these {len(papers)} research papers and respond using EXACTLY these markers on their own line:
 
 ##THEMES##
-Write themes here with citations [P1, page 2].
+[3-5 common themes with citations like [P1, page 2]]
 
 ##AGREEMENTS##
-Write agreements and contradictions here with citations [P2, page 4].
+[Where papers agree or contradict, with citations]
 
 ##GAPS##
-Write research gaps here with citations [P1, page 5].
+[5 specific research gaps with citations]
 
 ##SYNTHESIS##
-Write unified synthesis here with citations [P3, page 1].
+[3-5 sentence unified summary with citations]
 
-Papers:
+##MEMORY##
+[ONLY include this section if past research sessions are provided below. Connect the new papers to past research. Mention: (1) topics that appear in both old and new research, (2) whether new papers fill any previously identified gaps, (3) any contradictions with past findings. If no past sessions exist, write: "This is your first research session. Future syntheses will show connections to this work." Be specific and cite paper names.]
+
+{f"Past research context:{memory_context}" if memory_context else "No past research sessions found."}
+
+New papers to analyse:
 {context}"""
             }
         ]
     )
 
     raw = message.content[0].text
+    print("RAW RESPONSE:\n", raw)
 
-    import re
-    sections = {"themes": "", "agreements": "", "gaps": "", "synthesis": ""}
+    sections = {"themes": "", "agreements": "", "gaps": "", "synthesis": "", "memory": ""}
     markers = {
         "##THEMES##": "themes",
         "##AGREEMENTS##": "agreements",
         "##GAPS##": "gaps",
         "##SYNTHESIS##": "synthesis",
+        "##MEMORY##": "memory",
     }
 
     current = None
+    seen = set()
     for line in raw.splitlines():
         stripped = line.strip()
         if stripped in markers:
-            current = markers[stripped]
+            if stripped in seen:
+                current = None  # ignore duplicate sections
+            else:
+                seen.add(stripped)
+                current = markers[stripped]
         elif current:
             sections[current] += line + "\n"
 
@@ -136,24 +169,28 @@ Papers:
         "agreements": sections["agreements"].strip(),
         "gaps": sections["gaps"].strip(),
         "synthesis": sections["synthesis"].strip(),
+        "memory": sections["memory"].strip() or "This is your first research session. Future syntheses will show connections to this work.",
     }
 
-    # Save to Supabase if user is logged in
     if user_id and authorization:
-        token = authorization.split(" ")[1]
-        user_supabase = create_client(
-            os.getenv("SUPABASE_URL"),
-            os.getenv("SUPABASE_KEY"),
-        )
-        user_supabase.postgrest.auth(token)
-        user_supabase.table("syntheses").insert({
-            "user_id": user_id,
-            "papers": result["papers"],
-            "themes": result["themes"],
-            "agreements": result["agreements"],
-            "gaps": result["gaps"],
-            "synthesis": result["synthesis"],
-        }).execute()
+        try:
+            token = authorization.split(" ")[1]
+            save_supabase = create_client(
+                os.getenv("SUPABASE_URL"),
+                os.getenv("SUPABASE_KEY"),
+            )
+            save_supabase.postgrest.auth(token)
+            save_supabase.table("syntheses").insert({
+                "user_id": user_id,
+                "papers": result["papers"],
+                "themes": result["themes"],
+                "agreements": result["agreements"],
+                "gaps": result["gaps"],
+                "synthesis": result["synthesis"],
+                "memory": result["memory"],
+            }).execute()
+        except Exception as e:
+            print(f"Save error: {e}")
 
     return result
 
