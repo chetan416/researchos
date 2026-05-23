@@ -191,6 +191,7 @@ New papers to analyse:
             }).execute()
         except Exception as e:
             print(f"Save error: {e}")
+            print(f"Save error type: {type(e)}")
 
     return result
 
